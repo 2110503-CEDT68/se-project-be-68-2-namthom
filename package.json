@@ -1,0 +1,32 @@
+{
+  "name": "vacq",
+  "version": "1.0.0",
+  "description": "[![Review Assignment Due Date](https://classroom.github.com/assets/deadline-readme-button-22041afd0340ce965d47ae6ef1cefeee28c7c493a6346c4f15d667ab976d596c.svg)](https://classroom.github.com/a/c1cqHQ5R)",
+  "homepage": "https://github.com/2110503-CEDT68/a-7-nkhaooat#readme",
+  "bugs": {
+    "url": "https://github.com/2110503-CEDT68/a-7-nkhaooat/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/2110503-CEDT68/a-7-nkhaooat.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "csv-parser": "^3.2.0",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.2.1",
+    "nodemon": "^3.1.14"
+  }
+}
