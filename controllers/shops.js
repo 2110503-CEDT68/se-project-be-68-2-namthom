@@ -5,50 +5,81 @@ const MassageShop = require('../models/MassageShop');
 // @access  Public
 exports.getShops = async (req, res, next) => {
     try {
-        let query;
-        const reqQuery = { ...req.query };
-        const removeFields = ['select', 'sort', 'page', 'limit'];
-        removeFields.forEach(param => delete reqQuery[param]);
+        let query = {};
+        let sortQuery = {};
 
-        let queryStr = JSON.stringify(reqQuery);
-        queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
-        query = MassageShop.find(JSON.parse(queryStr));
-
-        if (req.query.select) {
-            const fields = req.query.select.split(',').join(' ');
-            query = query.select(fields);
+        // Search by name
+        if (req.query.search) {
+            query.name = { $regex: req.query.search, $options: 'i' };
         }
 
-        if (req.query.sort) {
-            const sortBy = req.query.sort.split(',').join(' ');
-            query = query.sort(sortBy);
+        // Filter by search area
+        if (req.query.searchArea) {
+            query.searchArea = req.query.searchArea;
+        }
+
+        // Filter by minimum rating
+        if (req.query.minRating) {
+            query.rating = { $gte: parseFloat(req.query.minRating) };
+        }
+
+        // Filter by price range
+        if (req.query.minPrice || req.query.maxPrice) {
+            query.priceRangeMin = {};
+            if (req.query.minPrice) query.priceRangeMin.$gte = parseInt(req.query.minPrice);
+            if (req.query.maxPrice) query.priceRangeMin.$lte = parseInt(req.query.maxPrice);
+        }
+
+        // Sorting
+        const sortBy = req.query.sortBy || 'rating';
+        const sortOrder = req.query.sortOrder === 'asc' ? 1 : -1;
+        
+        if (sortBy === 'price') {
+            sortQuery.priceRangeMin = sortOrder;
+        } else if (sortBy === 'name') {
+            sortQuery.name = sortOrder;
         } else {
-            query = query.sort('-createdAt');
+            sortQuery.rating = sortOrder;
         }
 
         const page = parseInt(req.query.page, 10) || 1;
-        const limit = parseInt(req.query.limit, 10) || 25;
+        const limit = parseInt(req.query.limit, 10) || 12;
         const startIndex = (page - 1) * limit;
-        const endIndex = page * limit;
-        const total = await MassageShop.countDocuments();
+        const total = await MassageShop.countDocuments(query);
 
-        query = query.skip(startIndex).limit(limit);
+        const shops = await MassageShop.find(query)
+            .sort(sortQuery)
+            .skip(startIndex)
+            .limit(limit);
 
-        const shops = await query;
-
-        const pagination = {};
-        if (endIndex < total) {
-            pagination.next = { page: page + 1, limit };
-        }
-        if (startIndex > 0) {
-            pagination.prev = { page: page - 1, limit };
-        }
+        const pages = Math.ceil(total / limit);
 
         res.status(200).json({
             success: true,
             count: shops.length,
-            pagination,
+            pagination: {
+                total,
+                page,
+                pages,
+                limit
+            },
             data: shops
+        });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Get all shop areas
+// @route   GET /api/v1/shops/areas
+// @access  Public
+exports.getShopAreas = async (req, res, next) => {
+    try {
+        const areas = await MassageShop.distinct('searchArea');
+        res.status(200).json({
+            success: true,
+            count: areas.length,
+            data: areas.filter(area => area) // Remove null/undefined
         });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
@@ -95,6 +126,96 @@ exports.updateShop = async (req, res, next) => {
             return res.status(404).json({ success: false, message: `Shop not found with id of ${req.params.id}` });
         }
         res.status(200).json({ success: true, data: shop });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Add TikTok links to a shop
+// @route   POST /api/v1/shops/:id/tiktok
+// @access  Private/Admin
+exports.addTiktokLinks = async (req, res, next) => {
+    try {
+        const { links } = req.body; // links: string[]
+        if (!links || !Array.isArray(links) || links.length === 0) {
+            return res.status(400).json({ success: false, message: 'links array is required' });
+        }
+        // Validate TikTok URLs
+        const validLinks = links.filter(l => typeof l === 'string' && l.includes('tiktok.com'));
+        if (validLinks.length === 0) {
+            return res.status(400).json({ success: false, message: 'No valid TikTok URLs provided' });
+        }
+        const shop = await MassageShop.findByIdAndUpdate(
+            req.params.id,
+            { $addToSet: { tiktokLinks: { $each: validLinks } } },
+            { new: true }
+        );
+        if (!shop) return res.status(404).json({ success: false, message: 'Shop not found' });
+        res.status(200).json({ success: true, data: shop.tiktokLinks });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Update (replace) TikTok links for a shop
+// @route   PUT /api/v1/shops/:id/tiktok
+// @access  Private/Admin
+exports.updateTiktokLinks = async (req, res, next) => {
+    try {
+        const { links } = req.body; // links: string[]
+        if (!Array.isArray(links)) {
+            return res.status(400).json({ success: false, message: 'links array is required' });
+        }
+        const validLinks = links.filter(l => typeof l === 'string' && l.includes('tiktok.com'));
+        const shop = await MassageShop.findByIdAndUpdate(
+            req.params.id,
+            { $set: { tiktokLinks: validLinks } },
+            { new: true }
+        );
+        if (!shop) return res.status(404).json({ success: false, message: 'Shop not found' });
+        res.status(200).json({ success: true, data: shop.tiktokLinks });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Remove a specific TikTok link from a shop
+// @route   DELETE /api/v1/shops/:id/tiktok
+// @access  Private/Admin
+exports.removeTiktokLink = async (req, res, next) => {
+    try {
+        const { link } = req.body; // link: string (single URL to remove)
+        if (!link) {
+            return res.status(400).json({ success: false, message: 'link is required' });
+        }
+        const shop = await MassageShop.findByIdAndUpdate(
+            req.params.id,
+            { $pull: { tiktokLinks: link } },
+            { new: true }
+        );
+        if (!shop) return res.status(404).json({ success: false, message: 'Shop not found' });
+        res.status(200).json({ success: true, data: shop.tiktokLinks });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
+};
+
+// @desc    Update shop description
+// @route   PUT /api/v1/shops/:id/description
+// @access  Private/Admin
+exports.updateDescription = async (req, res, next) => {
+    try {
+        const { description } = req.body;
+        if (typeof description !== 'string') {
+            return res.status(400).json({ success: false, message: 'description string is required' });
+        }
+        const shop = await MassageShop.findByIdAndUpdate(
+            req.params.id,
+            { $set: { description: description.trim() || null } },
+            { new: true }
+        );
+        if (!shop) return res.status(404).json({ success: false, message: 'Shop not found' });
+        res.status(200).json({ success: true, data: { description: shop.description } });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
     }
