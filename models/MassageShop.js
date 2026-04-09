@@ -39,6 +39,30 @@ const MassageShopSchema = new mongoose.Schema({
     priceRangeMax:{
         type: Number,
         required: [true,'Please add maximum price range']
+    },
+    rating:{
+        type: Number,
+        default: 0
+    },
+    photo:{
+        type: String,
+        default: null
+    },
+    placeId:{
+        type: String,
+        default: null
+    },
+    searchArea: {
+        type: String,
+        default: null
+    },
+    description: {
+        type: String,
+        default: null
+    },
+    tiktokLinks: {
+        type: [String],
+        default: []
     }
 }, {
     toJSON: { virtuals: true },
