@@ -467,3 +467,5 @@ function resetVectorStore() {
 }
 
 module.exports = { buildVectorStore, chat, resetVectorStore };
+
+// embed and retrieve cosine similarity implementation
