@@ -9,10 +9,13 @@ exports.getReservations = async (req, res, next) => {
     try {
         let query;
         
-        if (req.user.role === 'admin') {
-            // Admin can see all reservations with filters
+        // Check if user wants to see only their own bookings (myBookings=true)
+        const myBookingsOnly = req.query.myBookings === 'true';
+        
+        if (req.user.role === 'admin' && !myBookingsOnly) {
+            // Admin can see all reservations with filters (when accessing admin panel)
             let reqQuery = { ...req.query };
-            const removeFields = ['select', 'sort', 'page', 'limit'];
+            const removeFields = ['select', 'sort', 'page', 'limit', 'myBookings'];
             removeFields.forEach(param => delete reqQuery[param]);
 
             // Date range filter
@@ -28,7 +31,7 @@ exports.getReservations = async (req, res, next) => {
             queryStr = queryStr.replace(/\b(gt|gte|lt|lte|in)\b/g, match => `$${match}`);
             query = Reservation.find(JSON.parse(queryStr));
         } else {
-            // Regular user can only see their own reservations
+            // Regular user or admin viewing "My Bookings" - show only their own reservations
             query = Reservation.find({ user: req.user.id });
         }
 
@@ -55,13 +58,12 @@ exports.getReservations = async (req, res, next) => {
 
         const reservations = await query;
 
-        const pagination = {};
-        if (endIndex < total) {
-            pagination.next = { page: page + 1, limit };
-        }
-        if (startIndex > 0) {
-            pagination.prev = { page: page - 1, limit };
-        }
+        const pagination = {
+            total,
+            page,
+            pages: Math.ceil(total / limit),
+            limit
+        };
 
         res.status(200).json({
             success: true,
@@ -184,7 +186,11 @@ exports.updateReservation = async (req, res, next) => {
         reservation = await Reservation.findByIdAndUpdate(req.params.id, req.body, {
             new: true,
             runValidators: true
-        });
+        }).populate([
+            { path: 'shop', select: 'name address location tel openTime closeTime' },
+            { path: 'service', select: 'name area duration oil price sessions' },
+            { path: 'user', select: 'name email telephone' }
+        ]);
 
         res.status(200).json({ success: true, data: reservation });
     } catch (err) {
@@ -192,19 +198,19 @@ exports.updateReservation = async (req, res, next) => {
     }
 };
 
-// @desc    Delete/cancel reservation
+// @desc    Cancel reservation (soft delete - update status to canceled)
 // @route   DELETE /api/v1/reservations/:id
 // @access  Private
 exports.deleteReservation = async (req, res, next) => {
     try {
-        const reservation = await Reservation.findById(req.params.id);
+        let reservation = await Reservation.findById(req.params.id);
 
         if (!reservation) {
             return res.status(404).json({ success: false, message: `Reservation not found with id of ${req.params.id}` });
         }
 
-        // Admin can delete any reservation
-        // User can only delete their own and only if more than 1 day before reservation date
+        // Admin can cancel any reservation
+        // User can only cancel their own and only if more than 1 day before reservation date
         if (req.user.role !== 'admin') {
             if (reservation.user.toString() !== req.user.id) {
                 return res.status(403).json({ success: false, message: 'Not authorized to cancel this reservation' });
@@ -224,9 +230,15 @@ exports.deleteReservation = async (req, res, next) => {
             }
         }
 
-        await reservation.deleteOne();
+        // Soft delete: update status to cancelled instead of deleting
+        reservation.status = 'cancelled';
+        await reservation.save();
 
-        res.status(200).json({ success: true, data: {} });
+        res.status(200).json({ 
+            success: true, 
+            message: 'Reservation cancelled successfully',
+            data: reservation 
+        });
     } catch (err) {
         res.status(400).json({ success: false, message: err.message });
     }
