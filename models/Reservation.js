@@ -25,6 +25,39 @@ const ReservationSchema = new mongoose.Schema({
         ref: 'MassageService',
         required: true
     },
+    promotionCode: {
+        type: String,
+        default: null
+    },
+    discountAmount: {
+        type: Number,
+        default: 0
+    },
+    originalPrice: {
+        type: Number,
+        default: null
+    },
+    finalPrice: {
+        type: Number,
+        default: null
+    },
+    slipImageUrl: {
+        type: String,
+        default: null
+    },
+    paymentStatus: {
+        type: String,
+        enum: ['none', 'waiting_verification', 'approved', 'rejected'],
+        default: 'none'
+    },
+    qrToken: {
+        type: String,
+        default: null
+    },
+    qrActive: {
+        type: Boolean,
+        default: true
+    },
     createdAt: {
         type: Date,
         default: Date.now
