@@ -10,6 +10,8 @@ const helmet = require('helmet');
 const { globalLimiter } = require('./middleware/rateLimit');
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/errorHandler');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 
 // Routes
 const shops = require('./routes/shops');
@@ -49,9 +51,12 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Security headers
+app.set('trust proxy', 1); // Render terminates TLS — trust X-Forwarded-Proto for correct req.protocol
+
 app.use(helmet({
   contentSecurityPolicy: false, // Next.js handles its own CSP
   crossOriginEmbedderPolicy: false, // Allow Google Maps embeds
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow frontend on different port to load images
 }));
 
 // Global rate limiter
@@ -92,6 +97,9 @@ app.use('/api/v1/promotions', promotions);
 app.use('/api/v1/qr', qr);
 app.use('/api/v1/admin/merchants', merchants);
 app.use('/api/v1/merchant', merchant);
+
+// Swagger API documentation
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // API root route
 app.get('/', (req, res) => {
