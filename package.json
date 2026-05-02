@@ -21,8 +21,13 @@
   },
   "jest": {
     "collectCoverageFrom": [
-      "scripts/createReservation.js",
-      "utils/addTiktokLinks.js"
+      "controllers/**/*.js",
+      "models/**/*.js",
+      "routes/**/*.js",
+      "middleware/**/*.js",
+      "services/**/*.js",
+      "utils/**/*.js",
+      "cron/**/*.js"
     ],
     "coverageThreshold": {
       "global": {
